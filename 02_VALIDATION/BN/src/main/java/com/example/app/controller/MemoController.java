@@ -33,7 +33,7 @@ public class MemoController {
                 log.info("Error Field : "+error.getField()+" Error Msg : "+error.getDefaultMessage());
                 map.put(error.getField(),error.getDefaultMessage());
             }
-            return new ResponseEntity<>(map, HttpStatus.EXPECTATION_FAILED);
+            return new ResponseEntity<>(map, HttpStatus.OK);
         }
 
         return new ResponseEntity<>(map,HttpStatus.OK);
