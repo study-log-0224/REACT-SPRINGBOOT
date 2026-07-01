@@ -1,6 +1,7 @@
-package com.example.demo.config.auth.provider;
+package com.example.demo.Config.auth.provider;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -9,19 +10,22 @@ import java.util.Map;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class NaverUserInfo implements OAuth2UserInfo{
-    private String id;
-    private Map<String,Object> attributes;
+
+    private String resultcode;
+    private String message;
+    private Map<String,Object> response;
 
 
     @Override
     public String getName() {
-        return (String)attributes.get("name");
+        return (String)response.get("name");
     }
 
     @Override
     public String getEmail() {
-        return (String)attributes.get("email");
+        return (String)response.get("email");
     }
 
     @Override
@@ -31,6 +35,11 @@ public class NaverUserInfo implements OAuth2UserInfo{
 
     @Override
     public String getProviderId() {
-        return id;
+        return (String)response.get("id");
+    }
+
+    @Override
+    public Map<String, Object> getAttributes() {
+        return response;
     }
 }

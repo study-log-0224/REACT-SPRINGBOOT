@@ -1,7 +1,8 @@
-package com.example.demo.config.auth.redis;
+package com.example.demo.Config.auth.redis;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -11,9 +12,12 @@ import java.util.concurrent.TimeUnit;
 @Component
 @RequiredArgsConstructor
 public class RedisUtil {
+
+
     private final RedisTemplate<String, String> redisTemplate;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+
 
     public void save(String key, String value) {
         redisTemplate.opsForValue().set(key, value);

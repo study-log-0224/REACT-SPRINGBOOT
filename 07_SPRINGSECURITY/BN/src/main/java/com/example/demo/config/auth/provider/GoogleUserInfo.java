@@ -1,6 +1,8 @@
-package com.example.demo.config.auth.provider;
+package com.example.demo.Config.auth.provider;
+
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -9,9 +11,10 @@ import java.util.Map;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class GoogleUserInfo implements OAuth2UserInfo{
-    private String id;
-    private Map<String,Object> attributes;
+
+    Map<String,Object> attributes;
 
     @Override
     public String getName() {
@@ -25,11 +28,16 @@ public class GoogleUserInfo implements OAuth2UserInfo{
 
     @Override
     public String getProvider() {
-        return "google";
+        return "Google";
     }
 
     @Override
     public String getProviderId() {
-        return this.id;
+        return (String)attributes.get("sub");
+    }
+
+    @Override
+    public Map<String, Object> getAttributes() {
+        return attributes;
     }
 }

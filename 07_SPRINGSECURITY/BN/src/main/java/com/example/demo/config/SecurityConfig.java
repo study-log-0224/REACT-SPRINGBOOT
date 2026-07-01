@@ -1,17 +1,7 @@
-package com.example.demo.config;
+package com.example.demo.Config;
 
-
-import com.example.demo.config.auth.exceptionHandler.CustomAccessDeniedHandler;
-import com.example.demo.config.auth.exceptionHandler.CustomAuthenticationEntryPoint;
-import com.example.demo.config.auth.jwt.JwtAuthorizationFilter;
-import com.example.demo.config.auth.jwt.JwtTokenProvider;
-import com.example.demo.config.auth.loginHandler.CustomLoginFailureHandler;
-import com.example.demo.config.auth.loginHandler.CustomLoginSuccessHandler;
-import com.example.demo.config.auth.logoutHandler.CustomLogoutHandler;
-import com.example.demo.config.auth.logoutHandler.CustomLogoutSuccessHandler;
-import com.example.demo.config.auth.redis.RedisUtil;
-import com.example.demo.domain.repository.JwtTokenRepository;
-import com.example.demo.domain.repository.UserRepository;
+import com.example.demo.Config.auth.handler.*;
+import com.example.demo.Config.auth.jwt.JWTAuthorizationFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -25,7 +15,6 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.logout.LogoutFilter;
-import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 
@@ -35,111 +24,143 @@ import java.util.Collections;
 @EnableWebSecurity
 public class SecurityConfig {
 
-	@Autowired
-	private CustomLoginSuccessHandler customLoginSuccessHandler;
-	@Autowired
-	private CustomLogoutHandler customLogoutHandler;
-	@Autowired
-	private CustomLogoutSuccessHandler customLogoutSuccessHandler;
-	@Autowired
-	private UserRepository userRepository;
-	@Autowired
-	private JwtTokenProvider jwtTokenProvider;
-	@Autowired
-	private JwtTokenRepository jwtTokenRepository;
-	@Autowired
-	private RedisUtil redisUtil;
 
+    @Autowired
+    JWTAuthorizationFilter jwtAuthorizationFilter;
 
-	@Bean
-	protected SecurityFilterChain configure(HttpSecurity http) throws Exception {
-		//CSRF비활성화
-		http.csrf((config)->{config.disable();});
-		//CSRF토큰 쿠키형태로 전달
-//		http.csrf().csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse());
-		//권한체크
-		http.authorizeHttpRequests((auth)->{
-			auth.requestMatchers("/","/join","/login","/validate").permitAll();
-			auth.requestMatchers("/user").hasRole("USER");
-			auth.requestMatchers("/manager").hasRole("MANAGER");
-			auth.requestMatchers("/admin").hasRole("ADMIN");
-			auth.anyRequest().authenticated();
-		});
-		//-----------------------------------------------------
-		// [수정] 로그인(직접처리 - UserRestController)
-		//-----------------------------------------------------
-		http.formLogin((login)->{
-			login.disable();
+    @Autowired
+    CustomLoginSuccessHandler customLoginSuccessHandler;
+    @Autowired
+    CustomLoginFailureHandler customLoginFailureHandler;
+    @Autowired
+    CustomLogoutHandler customLogoutHandler;
+    @Autowired
+    CustomLogoutSuccessHandler customLogoutSuccessHandler;
+    @Autowired
+    CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
+    @Autowired
+    CustomAccessDeniedHandler customAccessDeniedHandler;
+
+    @Bean
+    protected SecurityFilterChain configure(HttpSecurity http) throws Exception
+    {
+        //CSRF 비활성화(비활성화하지 않으면 logout 요청은 기본적으로 POST방식을 따른다)
+        http.csrf((config)->{config.disable();});
+
+        //권한처리
+        http.authorizeHttpRequests((auth)->{
+            //정적경로 매핑
+            auth.requestMatchers("/favicon.ico").permitAll();
+
+            auth.requestMatchers("/","/join","/login").permitAll();
+            //
+            auth.requestMatchers("/user").hasAnyRole("USER","ADMIN"); //
+            auth.requestMatchers("/manager").hasAnyRole("MANAGER"); //
+            auth.requestMatchers("/admin").hasAnyRole("ADMIN"); //
+
+            auth.anyRequest().authenticated();
+        });
+
+        //-----------------------------------------------------
+        // [수정] 로그인(직접처리 - UserRestController)
+        //-----------------------------------------------------
+        http.formLogin((login)->{
+            login.disable();
 //            login.permitAll();
 //            login.loginPage("/login");
 //            login.successHandler(customLoginSuccessHandler());
 //            login.failureHandler(new CustomAuthenticationFailureHandler());
-		});
+        });
 
-		//로그아웃
-		http.logout((logout)->{
-			logout.permitAll();
-			logout.addLogoutHandler(customLogoutHandler);
-			logout.logoutSuccessHandler(customLogoutSuccessHandler);
-		});
-		//예외처리
 
-		http.exceptionHandling((ex)->{
-			ex.authenticationEntryPoint(new CustomAuthenticationEntryPoint());
-			ex.accessDeniedHandler(new CustomAccessDeniedHandler());
-		});
+        //로그인
+        http.formLogin((login)->{
+            login.permitAll();
+            login.loginPage("/login");
+            login.successHandler(customLoginSuccessHandler);//로그인 성공시 동작하는 핸들러
+            login.failureHandler(customLoginFailureHandler); //로그인 실패시(ID 미존재 , PW 불일치)
+        });
+        //로그아웃
+        http.logout((logout)->{
+            logout.permitAll();
+            logout.addLogoutHandler(customLogoutHandler); //로그아웃 직접처리 핸들러
+            logout.logoutSuccessHandler(customLogoutSuccessHandler);//로그아웃 성공시 동작하는 핸들러
+        });
 
-		//OAUTH2-CLIENT
-		http.oauth2Login((oauth2)->{
-			oauth2.loginPage("/login");
-		});
+        //예외처리
+        http.exceptionHandling(exception->{
+            exception.authenticationEntryPoint(customAuthenticationEntryPoint); //미인증된 상태+ 권한이 필요한 Endpoint 접근시 예외 처리
+            exception.accessDeniedHandler(customAccessDeniedHandler); //인증이후 권한이 부족할때
+        });
 
-		//SESSION INVALIDATED
-		http.sessionManagement((sessionManagerConfigure)->{
-			sessionManagerConfigure.sessionCreationPolicy(SessionCreationPolicy.STATELESS);
-		});
+        //OAuth2-Client 활성
+        http.oauth2Login((oauth2)->{
+            oauth2.loginPage("/login");
+        });
 
-		//JWT FILTER ADD
-		http.addFilterBefore(new JwtAuthorizationFilter(userRepository,jwtTokenProvider,jwtTokenRepository,redisUtil), LogoutFilter.class);
-		//-----------------------------------------------------------------------
-		//[추가] CORS - 다른 domain(react)에서 넘어오기 때문에 security 수준에서 설정해줌
-		//-----------------------------------------------------------------------
-		http.cors((config)->{
-			config.configurationSource(corsConfigurationSource());
-		});
+        //SESSION 비활성화
+        http.sessionManagement((sessionConfig)->{
+            sessionConfig.sessionCreationPolicy(SessionCreationPolicy.STATELESS);
+        });
 
-		return http.build();
-		
-	}
+        //JWTFilter 추가
+        http.addFilterBefore(jwtAuthorizationFilter, LogoutFilter.class);
 
-	@Bean
-	public PasswordEncoder passwordEncoder() {
-		return new BCryptPasswordEncoder();
-	}
-	//-----------------------------------------------------
-	//[추가] CORS
-	//-----------------------------------------------------
-	@Bean
-	CorsConfigurationSource corsConfigurationSource(){
-		CorsConfiguration config = new CorsConfiguration();
-		config.setAllowedHeaders(Collections.singletonList("*")); //허용헤더
-		config.setAllowedMethods(Collections.singletonList("*")); //허용메서드
-		config.setAllowedOriginPatterns(Collections.singletonList("http://localhost:3000"));  //허용도메인
-		config.setAllowCredentials(true); // COOKIE TOKEN OPTION
-		return new CorsConfigurationSource(){
-			@Override
-			public CorsConfiguration getCorsConfiguration(HttpServletRequest request) {
-				return config;
-			}
-		};
-	}
-	//-----------------------------------------------------
-	//[추가] ATHENTICATION MANAGER 설정 - 로그인 직접처리를 위한 BEAN
-	//-----------------------------------------------------
-	@Bean
-	public AuthenticationManager authenticationManager(
-			AuthenticationConfiguration authenticationConfiguration) throws Exception {
-		return authenticationConfiguration.getAuthenticationManager();
-	}
+        return http.build();
+    }
+
+
+    // 임시계정 생성
+//    @Bean
+//    UserDetailsService users() {
+//        UserDetails user = User.withUsername("user")
+//                .password("{noop}1234")   // 비밀번호 인코딩 없음 (실습용)
+//                .roles("USER")            // ROLE_USER
+//                .build();
+//
+//        UserDetails manager = User.withUsername("manager")
+//                .password("{noop}1234")
+//                .roles("MANAGER")         // ROLE_MANAGER
+//                .build();
+//
+//        UserDetails admin = User.withUsername("admin")
+//                .password("{noop}1234")
+//                .roles("ADMIN")           // ROLE_ADMIN
+//                .build();
+//
+//        return new InMemoryUserDetailsManager(user, manager, admin);
+//    }
+
+
+    @Bean
+    public PasswordEncoder passwordEncoder(){
+        return new BCryptPasswordEncoder();
+    }
+
+    //-----------------------------------------------------
+    //[추가] CORS
+    //-----------------------------------------------------
+    @Bean
+    CorsConfigurationSource corsConfigurationSource(){
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedHeaders(Collections.singletonList("*")); //허용헤더
+        config.setAllowedMethods(Collections.singletonList("*")); //허용메서드
+        config.setAllowedOriginPatterns(Collections.singletonList("http://localhost:3000"));  //허용도메인
+        config.setAllowCredentials(true); // COOKIE TOKEN OPTION
+        return new CorsConfigurationSource(){
+            @Override
+            public CorsConfiguration getCorsConfiguration(HttpServletRequest request) {
+                return config;
+            }
+        };
+    }
+    //-----------------------------------------------------
+    //[추가] ATHENTICATION MANAGER 설정 - 로그인 직접처리를 위한 BEAN
+    //-----------------------------------------------------
+    @Bean
+    public AuthenticationManager authenticationManager(
+            AuthenticationConfiguration authenticationConfiguration) throws Exception {
+        return authenticationConfiguration.getAuthenticationManager();
+    }
 
 }

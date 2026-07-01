@@ -1,12 +1,11 @@
-package com.example.demo.config.auth.jwt;
+package com.example.demo.Config.auth.jwt;
 
 
-import com.example.demo.config.auth.PrincipalDetails;
-import com.example.demo.domain.dto.UserDto;
-import com.example.demo.domain.entity.Signature;
-import com.example.demo.domain.entity.User;
-import com.example.demo.domain.repository.SignatureRepository;
-import com.example.demo.domain.repository.UserRepository;
+import com.example.demo.Config.auth.PrincipalDetails;
+import com.example.demo.Domain.Common.Dtos.UserDTO;
+import com.example.demo.Domain.Common.Entity.Signature;
+import com.example.demo.Domain.Common.Repository.SignatureRepository;
+import com.example.demo.Domain.Common.Repository.UserRepository;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
@@ -16,83 +15,79 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import java.security.Key;
 import java.time.LocalDate;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Date;
+import java.util.List;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Component
-public class JwtTokenProvider {
+public class JWTTokenProvider {
 
     @Autowired
     private UserRepository userRepository;
 
     @Autowired
     private SignatureRepository signatureRepository;
-    //Key 저장
-    private Key key;
-    public void setKey(Key key){
-        this.key = key;
-    }
+
+    //Key
+    private Key key ;
+
+
     public Key getKey(){
-        return this.key;
+            return this.key;
     }
 
-    //SIGNATURE 저장
     @PostConstruct
     public void init(){
-        List<Signature> list = signatureRepository.findAll(); //1개 값만 저장되어있음
-        if(list.isEmpty()){
-            //처음 SIGNATURE발급
-            byte[] keyBytes = KeyGenerator.getKeygen();
-            this.key = Keys.hmacShaKeyFor(keyBytes);
-            Signature signature = new Signature();
-            signature.setKeyBytes(keyBytes);
-            signature.setCreateAt(LocalDate.now());
-            signatureRepository.save(signature);
-            System.out.println("JwtTokenProvider init()  Key init : " + key);
-        }else{
-            //기존 SIGNATURE이용
-            Signature signature = list.get(0);
-            this.key = Keys.hmacShaKeyFor(signature.getKeyBytes());
-            System.out.println("JwtTokenProvider init()  기존 Key 사용 : " + key);
+            List<Signature> list = signatureRepository.findAll();
+            if(list.isEmpty()){
+                byte[] keyBytes = KeyGenerator.keyGen();
+                this.key = Keys.hmacShaKeyFor(keyBytes);
+
+                Signature signature = new Signature();
+                signature.setKeyBytes(keyBytes);
+                signature.setCreateAt(LocalDate.now());
+                signatureRepository.save(signature);
+
+            }else{
+                Signature signature = list.get(0);
+                this.key = Keys.hmacShaKeyFor(signature.getKeyBytes());
+            }
+
         }
-    }
-    public JwtTokenProvider() {
 
-    }
 
-    // 유저 정보를 가지고 AccessToken, RefreshToken 을 생성하는 메서드
-    public TokenInfo generateToken(Authentication authentication) {
-        // 권한 가져오기
-        String authorities = authentication.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .collect(Collectors.joining(","));
-        long now = (new Date()).getTime();
+    public TokenInfo generateToken(Authentication authentication){
 
-        // Access Token 생성
-        Date accessTokenExpiresIn = new Date(now + JwtProperties.ACCESS_TOKEN_EXPIRATION_TIME); // 60초후 만료
+        //계정정보 - 계정명 / auth(role)
+        //"ROLE_USER,ROLE_MANAGER"
+        String authorities = authentication  .getAuthorities()// Collection<SimpleGrantedAuthority> authorities 반환
+                .stream()   // Stream 함수 사용예정
+                .map((role)->{return role.getAuthority();}) // 각각 GrantedAuthoriy("ROLE~")들을 문자열값으로 반환해서 map처리
+                .collect(Collectors.joining(",")); //각각의 role(ROLE_ADMIN ROLE_USER...) 를 ','를 기준으로 묶음 ("ROLE_USER,ROLE_ADMIN")
+        //AccessToken(서버의 서비스를 이용제한 )
+        long now = (new Date()).getTime();  //현재시간
         String accessToken = Jwts.builder()
-                .setSubject(authentication.getName())
-                .claim("username",authentication.getName()) //정보저장
-                .claim("auth", authorities)//정보저장
-                .setExpiration(accessTokenExpiresIn)
-                .signWith(key, SignatureAlgorithm.HS256)
-                .compact();
-
-        // Refresh Token 생성
+                            .setSubject(authentication.getName()) //본문 TITLE
+                            .setExpiration(new Date(now + JWTProperties.ACCESS_TOKEN_EXPIRATION_TIME )) //만료날짜(밀리초단위)
+                            .signWith(key, SignatureAlgorithm.HS256) // 서명값
+                            .claim("username",authentication.getName()) // 본문 내용
+                            .claim("auth",authorities) // 본문 내용
+                            .compact();
+        //RefreshToken(AccessToken 만료시 갱신처리)
         String refreshToken = Jwts.builder()
-                .setExpiration(new Date(now + JwtProperties.REFRESH_TOKEN_EXPIRATION_TIME))    //1일: 24 * 60 * 60 * 1000 = 86400000
-                .signWith(key, SignatureAlgorithm.HS256)
-                .compact();
+                            .setSubject("Refresh_Token_Title") //본문 TITLE
+                            .setExpiration(new Date(now + JWTProperties.REFRESH_TOKEN_EXPIRATION_TIME )) //만료날짜(밀리초단위)
+                            .signWith(key, SignatureAlgorithm.HS256) // 서명값
+                            .compact();
 
-        System.out.println("JwtTokenProvider.generateToken.accessToken : " + accessToken);
-        System.out.println("JwtTokenProvider.generateToken.refreshToken : " + refreshToken);
-
+        //TokenInfo
         return TokenInfo.builder()
                 .grantType("Bearer")
                 .accessToken(accessToken)
@@ -100,63 +95,63 @@ public class JwtTokenProvider {
                 .build();
     }
 
+    public Authentication getAuthentication(String accessToken) throws ExpiredJwtException
+    {
+        Claims claims = Jwts.parser().setSigningKey(key).build().parseClaimsJws(accessToken).getBody();
 
-    // JWT 토큰을 복호화하여 토큰에 들어있는 정보를 꺼내는 메서드
-    public Authentication getAuthentication(String accessToken) {
-        // 토큰 복호화
-        Claims claims = parseClaims(accessToken);
+        String username = claims.getSubject(); // username
+        username = (String)claims.get("username"); //username
+        String auth = (String)claims.get("auth"); //"ROLE_USER,ROLE_ADMIN"
 
-        if (claims.get("auth") == null) {
-            throw new RuntimeException("권한 정보가 없는 토큰입니다.");
+        Collection<GrantedAuthority> authorities = new ArrayList<>();
+        String roles [] = auth.split(","); //["ROLE_ADMIN","ROLE_USER"]
+        for(String role : roles){
+            authorities.add(new SimpleGrantedAuthority(role));
         }
-        // 클레임에서 권한 정보 가져오기
-        Collection<? extends GrantedAuthority> authorities =
-                Arrays.stream(claims.get("auth").toString().split(","))
-                        .map(auth -> new SimpleGrantedAuthority(auth))
-                        .collect(Collectors.toList());
 
-        String username = claims.getSubject(); //username
 
-        // PrincipalDetails 생성
-        PrincipalDetails principalDetails = new PrincipalDetails();
-        Optional<User> userOptional = userRepository.findById(username);
-        UserDto userDto = null;
-        if(userOptional.isPresent())
-            userDto = UserDto.toDto(userOptional.get());
-        principalDetails.setUserDto(userDto);
+        PrincipalDetails principalDetails = null;
+        UserDTO dto = null;
+        if(userRepository.existsById(username)){
 
-        System.out.println("JwtTokenProvider.getAuthentication UsernamePasswordAuthenticationToken : " + accessToken);
-        UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken =
-                new UsernamePasswordAuthenticationToken(principalDetails, "", authorities);
-        return usernamePasswordAuthenticationToken;
+            dto = new UserDTO();
+            dto.setUsername(username);
+            dto.setRole(auth);
+            dto.setPassword(null);
+
+            principalDetails = new PrincipalDetails(dto,null);
+        }
+
+        if(principalDetails!=null) {
+            UsernamePasswordAuthenticationToken authenticationToken =
+                    new UsernamePasswordAuthenticationToken(principalDetails, null, authorities);
+            return authenticationToken;
+        }
+
+        return null;
+
+
     }
 
-    private Claims parseClaims(String accessToken) {
+    public boolean validateToken(String token) throws Exception
+    {
+        boolean isValid = false;
         try {
-            return Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(accessToken).getBody();
-        } catch (ExpiredJwtException e) {
-            return e.getClaims();
+            Jwts.parser().setSigningKey(key).build().parseClaimsJws(token);
+            isValid = true;
+        }catch(ExpiredJwtException e) {
+            // 토큰 만료시 예외
+            log.info("[ExpiredJwtException].." + e.getMessage());
+            throw new ExpiredJwtException(null,null,null); //header,claims,message
         }
+        return isValid;
+
+        // SecurityException	서명 불일치	변조된 토큰 또는 잘못된 키
+        // MalformedJwtException 형식 오류	JWT 구조(header.payload.signature) 깨짐
+        // ExpiredJwtException	만료된 토큰	exp 클레임이 현재 시간 이전
+        // UnsupportedJwtException	지원되지 않는 형식	비표준 JWT, 미지원 알고리즘
+        // IllegalArgumentException	잘못된 입력	null 또는 빈 토큰
     }
 
-    // 토큰 정보를 검증하는 메서드
-    public boolean validateToken(String token) throws ExpiredJwtException{
-        try {
-            Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
-            return true;
-        } catch (io.jsonwebtoken.security.SecurityException | MalformedJwtException e) {
-            log.info("Invalid JWT Token", e);
-        }
-        catch (ExpiredJwtException e) {
-            log.info("Expired JWT Token", e);
-            throw new ExpiredJwtException(null,null,null);
-
-        } catch (UnsupportedJwtException e) {
-            log.info("Unsupported JWT Token", e);
-        } catch (IllegalArgumentException e) {
-            log.info("JWT claims string is empty.", e);
-        }
-        return false;
-    }
 
 }

@@ -1,4 +1,4 @@
-package com.example.demo.config.auth.redis;
+package com.example.demo.Config.auth.redis;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;

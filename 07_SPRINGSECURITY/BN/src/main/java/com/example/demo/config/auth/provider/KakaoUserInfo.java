@@ -1,6 +1,7 @@
-package com.example.demo.config.auth.provider;
+package com.example.demo.Config.auth.provider;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -10,12 +11,12 @@ import java.util.Map;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class KakaoUserInfo implements OAuth2UserInfo{
     private Long id;
-    private LocalDateTime created_at;
+    private LocalDateTime connected_at;
     private Map<String,Object> properties;
     private Map<String,Object> kakao_account;
-
     @Override
     public String getName() {
         return (String)properties.get("nickname");
@@ -33,12 +34,11 @@ public class KakaoUserInfo implements OAuth2UserInfo{
 
     @Override
     public String getProviderId() {
-        return id+"";
+        return id!=null ? id.toString() : "-1";
     }
 
     @Override
     public Map<String, Object> getAttributes() {
-        return null;
+        return kakao_account;
     }
-//    private Map<String,Object> attributes;
 }
