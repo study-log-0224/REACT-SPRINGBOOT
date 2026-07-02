@@ -44,6 +44,8 @@ public class SecurityConfig {
     @Bean
     protected SecurityFilterChain configure(HttpSecurity http) throws Exception
     {
+        http.cors((config) -> config.configurationSource(corsConfigurationSource()));
+
         //CSRF 비활성화(비활성화하지 않으면 logout 요청은 기본적으로 POST방식을 따른다)
         http.csrf((config)->{config.disable();});
 
@@ -52,7 +54,7 @@ public class SecurityConfig {
             //정적경로 매핑
             auth.requestMatchers("/favicon.ico").permitAll();
 
-            auth.requestMatchers("/","/join","/login").permitAll();
+            auth.requestMatchers("/","/join","/login","/validate").permitAll();
             //
             auth.requestMatchers("/user").hasAnyRole("USER","ADMIN"); //
             auth.requestMatchers("/manager").hasAnyRole("MANAGER"); //
@@ -73,13 +75,13 @@ public class SecurityConfig {
         });
 
 
-        //로그인
-        http.formLogin((login)->{
-            login.permitAll();
-            login.loginPage("/login");
-            login.successHandler(customLoginSuccessHandler);//로그인 성공시 동작하는 핸들러
-            login.failureHandler(customLoginFailureHandler); //로그인 실패시(ID 미존재 , PW 불일치)
-        });
+//        //로그인
+//        http.formLogin((login)->{
+//            login.permitAll();
+//            login.loginPage("/login");
+//            login.successHandler(customLoginSuccessHandler);//로그인 성공시 동작하는 핸들러
+//            login.failureHandler(customLoginFailureHandler); //로그인 실패시(ID 미존재 , PW 불일치)
+//        });
         //로그아웃
         http.logout((logout)->{
             logout.permitAll();
@@ -108,29 +110,6 @@ public class SecurityConfig {
 
         return http.build();
     }
-
-
-    // 임시계정 생성
-//    @Bean
-//    UserDetailsService users() {
-//        UserDetails user = User.withUsername("user")
-//                .password("{noop}1234")   // 비밀번호 인코딩 없음 (실습용)
-//                .roles("USER")            // ROLE_USER
-//                .build();
-//
-//        UserDetails manager = User.withUsername("manager")
-//                .password("{noop}1234")
-//                .roles("MANAGER")         // ROLE_MANAGER
-//                .build();
-//
-//        UserDetails admin = User.withUsername("admin")
-//                .password("{noop}1234")
-//                .roles("ADMIN")           // ROLE_ADMIN
-//                .build();
-//
-//        return new InMemoryUserDetailsManager(user, manager, admin);
-//    }
-
 
     @Bean
     public PasswordEncoder passwordEncoder(){
