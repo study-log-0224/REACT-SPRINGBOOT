@@ -1,6 +1,7 @@
 import axios from "axios";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import api from "../api/axiosConfig";
 
 // 로그아웃 : 진입 즉시 BN /logout 호출 -> BN이 Redis RT 삭제 + 쿠키제거 -> /login 이동
 const Logout = () => {
@@ -8,7 +9,8 @@ const Logout = () => {
     useEffect(()=> {
         const performLogout = async() => {
             try {
-                await axios.post("http://localhost:8080/logout", {}, {withCredentials : true});
+                // await axios.post("http://localhost:8080/logout", {}, {withCredentials : true});
+                await api.post("/logout");
             } catch(error) {
                 console.error("로그아웃 실패 : ",error);
             } finally {

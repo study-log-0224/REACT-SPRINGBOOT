@@ -1,6 +1,7 @@
 import axios from "axios";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import api from "../api/axiosConfig";
 
 const Login = () => {
 
@@ -24,10 +25,15 @@ const Login = () => {
 
     const handleLogin = async ()=>{
         try{
-            const resp = await axios.post(
-                "http://localhost:8080/login",
+            // const resp = await axios.post(
+            //     "http://localhost:8080/login",
+            //     {username, password},
+            //     {headers: {"Content-Type":"application/json"}, withCredentials: true}
+            // );
+            const resp = await api.post(
+                "/login",
                 {username, password},
-                {headers: {"Content-Type":"application/json"}, withCredentials: true}
+                {headers: {"Content-Type":"application/json"}}
             );
             alert("로그인 성공: " + resp.data);
             navigate("/"); // 성공 시 / 경로로 이ㅏ동
